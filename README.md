@@ -12,11 +12,21 @@ sortable list.
   every possible 3-hour window on wind speed (peaks around 14–28 knots) and
   wind direction relative to that spot's coastline. **Side-shore wind rates
   highest, side-onshore next, then onshore, then side-offshore, then
-  offshore** (flagged as effectively unsafe/not recommended). The
-  best-scoring window becomes that day's headline rating (1–5 stars).
+  offshore.** An offshore day is called out explicitly ("⚠ Offshore — not
+  good for kitesurfing") instead of a star rating, and any individual
+  offshore hour in the hour-by-hour table is flagged and highlighted the
+  same way. The best-scoring window becomes that day's headline rating
+  (1–5 stars) otherwise.
+- **Hourly detail**: every day's card includes a full hour-by-hour table
+  (7am–8pm) of wind speed, gusts, and direction — not just the best
+  window's average — so you can see exactly how the wind builds or drops
+  off through the day.
 - **Distance**: you type a home location once per visit; it's geocoded via
   OpenStreetMap's free [Nominatim](https://nominatim.org/) API, then
-  straight-line distance to each spot is calculated.
+  driving distance to each spot is fetched from [OSRM](https://project-osrm.org/)'s
+  free public routing server. If that routing request fails for a spot
+  (it's a best-effort demo server, not a guaranteed production service),
+  the card falls back to straight-line distance and says so.
 - Everything runs client-side — there's no backend or database.
 
 ## Files
@@ -65,7 +75,11 @@ GitHub Pages redeploys automatically within a minute or two.
 ## Notes / known limitations
 
 - Nominatim's usage policy asks for light traffic (a request or two per
-  visit is fine; don't hammer it).
+  visit is fine; don't hammer it). The same goes for OSRM's demo routing
+  server — fine for personal use, not meant for heavy or commercial
+  traffic. If it ever becomes unreliable, swapping in a key-based service
+  like OpenRouteService (free tier, requires signup) is a straightforward
+  change to `fetchRoadDistanceKm` in `app.js`.
 - If a spot's rating looks off for a day you know well, it's almost always
   the `onshoreBearing` value in `spots.js` that needs adjusting — it's a
   rough approximation of each coastline's real-world orientation.

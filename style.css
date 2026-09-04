@@ -146,21 +146,58 @@ main {
 .stars.rating-bad { color: var(--bad); }
 
 .spot-days {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 10px;
 }
 
-.day-box {
+.day-section {
   background: var(--bg);
   border-radius: 8px;
-  padding: 8px;
-  font-size: 0.78rem;
+  padding: 10px 12px;
+  font-size: 0.82rem;
 }
 
-.day-box .day-label { font-weight: 700; margin-bottom: 2px; }
-.day-box .day-dir { color: var(--muted); }
+.day-section .day-label { font-weight: 700; margin-bottom: 4px; }
+
+.offshore-warning {
+  color: var(--bad);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.hour-table-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+
+.hour-table {
+  width: 100%;
+  min-width: 320px;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.hour-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hour-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hour-table tr:last-child td { border-bottom: none; }
+
+.hour-table tr.hour-offshore td {
+  background: #fadada;
+  color: var(--bad);
+}
 
 .tag {
   display: inline-block;

@@ -115,6 +115,19 @@ async function geocodeHome(query) {
   return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), label: data[0].display_name };
 }
 
+// Road distance via OSRM's public routing server (free, no key). It's a
+// demo/evaluation instance, not an SLA'd production service — fine for a
+// personal tool making a handful of requests, but if it's ever flaky the
+// caller falls back to straight-line distance.
+async function fetchRoadDistanceKm(home, spot) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${home.lon},${home.lat};${spot.lon},${spot.lat}?overview=false`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Routing request failed");
+  const data = await res.json();
+  if (!data.routes || !data.routes.length) throw new Error("No route found");
+  return data.routes[0].distance / 1000; // meters -> km
+}
+
 // ---------- forecast fetch + per-day best-window computation ----------
 
 async function fetchSpotForecast(spot) {
@@ -167,10 +180,22 @@ function buildDayWindows(hourly, spot) {
       }
     }
 
+    const hours = idxs.map((i) => {
+      const dirInfo = directionInfo(dirs[i], spot.onshoreBearing);
+      return {
+        hour: parseInt(times[i].slice(11, 13), 10),
+        speed: speeds[i],
+        gust: gusts[i],
+        dir: dirs[i],
+        category: dirInfo.category,
+      };
+    });
+
     return {
       date,
       label: formatDayLabel(date),
       best,
+      hours,
     };
   });
 
@@ -187,7 +212,7 @@ function formatDayLabel(dateStr) {
 // ---------- app state + rendering ----------
 
 let map, markers = {};
-let results = []; // { spot, days, bestScore, bestDistance }
+let results = []; // { spot, days, bestScore, bestSpeed, distanceKm, distanceIsRoad }
 let currentSort = "rating";
 let home = null;
 
@@ -264,22 +289,47 @@ function renderList() {
     card.dataset.spot = r.spot.name;
 
     const daysHtml = r.days.map((d) => {
-      if (!d.best) return `<div class="day-box"><div class="day-label">${d.label}</div>no data</div>`;
+      if (!d.best) return `<div class="day-section"><div class="day-label">${d.label}</div>no data</div>`;
+
       const dirLabel = compassLabel(d.best.avgDir);
-      return `<div class="day-box">
+      const isOffshore = d.best.category === "offshore";
+      const headline = isOffshore
+        ? `<div class="offshore-warning">⚠ Offshore — not good for kitesurfing</div>`
+        : `<div>${d.best.startHour}:00–${d.best.endHour}:00 best &middot; ${d.best.avgSpeed.toFixed(0)}kt (gusts ${d.best.avgGust.toFixed(0)}) &middot; ${dirLabel}
+             <span class="tag ${d.best.category}">${d.best.category}</span></div>`;
+
+      const hourRows = d.hours.map((h) => {
+        const hOffshore = h.category === "offshore";
+        return `<tr class="${hOffshore ? "hour-offshore" : ""}">
+          <td>${String(h.hour).padStart(2, "0")}:00</td>
+          <td>${h.speed.toFixed(0)}kt</td>
+          <td>${h.gust.toFixed(0)}kt</td>
+          <td>${compassLabel(h.dir)}</td>
+          <td><span class="tag ${h.category}">${hOffshore ? "Offshore" : h.category}</span></td>
+        </tr>`;
+      }).join("");
+
+      return `<div class="day-section">
         <div class="day-label">${d.label}</div>
-        <div>${d.best.startHour}:00–${d.best.endHour}:00</div>
-        <div>${d.best.avgSpeed.toFixed(0)}kt (gusts ${d.best.avgGust.toFixed(0)})</div>
-        <div class="day-dir">${dirLabel}</div>
-        <span class="tag ${d.best.category}">${d.best.category}</span>
+        ${headline}
+        <div class="hour-table-wrap">
+          <table class="hour-table">
+            <thead><tr><th>Hour</th><th>Wind</th><th>Gusts</th><th>Dir</th><th></th></tr></thead>
+            <tbody>${hourRows}</tbody>
+          </table>
+        </div>
       </div>`;
     }).join("");
+
+    const distLabel = r.distanceIsRoad
+      ? `${r.distanceKm.toFixed(0)} km by road`
+      : `${r.distanceKm.toFixed(0)} km straight-line (road distance unavailable)`;
 
     card.innerHTML = `
       <div class="spot-card-top">
         <div>
           <div class="spot-name">${r.spot.name}</div>
-          <div class="spot-meta">${r.spot.water} &middot; ${r.distanceKm.toFixed(0)} km from home</div>
+          <div class="spot-meta">${r.spot.water} &middot; ${distLabel} from home</div>
         </div>
         <div class="stars ${starClass(stars)}">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</div>
       </div>
@@ -304,7 +354,10 @@ async function loadSpots(homeLoc) {
   status.classList.remove("error");
 
   try {
-    const settled = await Promise.allSettled(SPOTS.map((s) => fetchSpotForecast(s)));
+    const [settled, distSettled] = await Promise.all([
+      Promise.allSettled(SPOTS.map((s) => fetchSpotForecast(s))),
+      Promise.allSettled(SPOTS.map((s) => fetchRoadDistanceKm(homeLoc, s))),
+    ]);
 
     results = SPOTS.map((spot, i) => {
       const outcome = settled[i];
@@ -312,8 +365,14 @@ async function loadSpots(homeLoc) {
       const scored = days.filter((d) => d.best);
       const bestScore = scored.length ? Math.max(...scored.map((d) => d.best.score)) : 0;
       const bestSpeed = scored.length ? Math.max(...scored.map((d) => d.best.avgSpeed)) : 0;
-      const distanceKm = haversineKm(homeLoc.lat, homeLoc.lon, spot.lat, spot.lon);
-      return { spot, days, bestScore, bestSpeed, distanceKm };
+
+      const distOutcome = distSettled[i];
+      const distanceIsRoad = distOutcome.status === "fulfilled";
+      const distanceKm = distanceIsRoad
+        ? distOutcome.value
+        : haversineKm(homeLoc.lat, homeLoc.lon, spot.lat, spot.lon);
+
+      return { spot, days, bestScore, bestSpeed, distanceKm, distanceIsRoad };
     });
 
     const failed = settled.filter((s) => s.status === "rejected").length;
