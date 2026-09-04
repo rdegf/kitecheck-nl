@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KiteCheck NL — Best kite spots, next 3 days</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header>
+  <h1>KiteCheck NL</h1>
+  <p class="subtitle">Best Dutch kitesurf spots for the next 3 days — wind speed, direction quality, and distance from home.</p>
+</header>
+
+<form id="home-form">
+  <label for="home-input">Home location</label>
+  <input id="home-input" type="text" placeholder="e.g. Haarlem, or a postcode" autocomplete="off" required />
+  <button type="submit">Find spots</button>
+  <span id="home-status" aria-live="polite"></span>
+</form>
+
+<main>
+  <div id="map"></div>
+
+  <div id="list-wrap">
+    <div id="sort-bar">
+      <span>Sort by:</span>
+      <button class="sort-btn active" data-sort="rating">Best rating</button>
+      <button class="sort-btn" data-sort="distance">Distance</button>
+      <button class="sort-btn" data-sort="speed">Wind speed</button>
+    </div>
+    <div id="spot-list"><p class="hint">Enter your home location above and hit "Find spots" to load the forecast.</p></div>
+  </div>
+</main>
+
+<footer>
+  <p>Wind data: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>. Geocoding: <a href="https://nominatim.org/" target="_blank" rel="noopener">OpenStreetMap Nominatim</a>. Map tiles &copy; OpenStreetMap contributors.</p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="spots.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
